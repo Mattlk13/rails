@@ -26,7 +26,7 @@ gem "bcrypt", "~> 3.1.11", require: false
 gem "uglifier", ">= 1.3.0", require: false
 
 # Explicitly avoid 1.x that doesn't support Ruby 2.4+
-gem "json", ">= 2.0.0"
+gem "json", ">= 2.3.0"
 
 group :rubocop do
   gem "rubocop", ">= 0.47", require: false
@@ -37,7 +37,7 @@ end
 group :doc do
   gem "sdoc", "~> 1.1"
   gem "redcarpet", "~> 3.2.3", platforms: :ruby
-  gem "w3c_validators"
+  gem "w3c_validators", ">= 1.3.4"
   gem "kindlerb", "~> 1.2.0"
 end
 
@@ -77,7 +77,7 @@ group :cable do
 
   gem "websocket-client-simple", github: "matthewd/websocket-client-simple", branch: "close-race", require: false
 
-  gem "blade", require: false, platforms: [:ruby]
+  gem "blade", ">= 0.7.1", require: false, platforms: [:ruby]
   gem "blade-sauce_labs_plugin", require: false, platforms: [:ruby]
   gem "sprockets-export", require: false
 end
