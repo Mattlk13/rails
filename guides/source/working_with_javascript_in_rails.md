@@ -70,6 +70,7 @@ Here's the simplest way to write JavaScript. You may see it referred to as
 ```html
 <a href="#" onclick="this.style.backgroundColor='#990000';event.preventDefault();">Paint it red</a>
 ```
+
 When clicked, the link background will become red. Here's the problem: what
 happens when we have lots of JavaScript we want to execute on a click?
 
@@ -168,12 +169,11 @@ remote elements inside your application.
 #### form_with
 
 [`form_with`](https://api.rubyonrails.org/classes/ActionView/Helpers/FormHelper.html#method-i-form_with)
-is a helper that assists with writing forms. By default, `form_with` assumes that
-your form will be using Ajax. You can opt out of this behavior by
-passing the `:local` option to `form_with`.
+is a helper that assists with writing forms. To use Ajax for your form you can
+pass the `:local` option to `form_with`.
 
 ```erb
-<%= form_with(model: @article, id: "new-article") do |form| %>
+<%= form_with(model: @article, id: "new-article", local: false) do |form| %>
   ...
 <% end %>
 ```

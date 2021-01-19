@@ -194,7 +194,7 @@ module ActionDispatch
               @arg_size       = @required_parts.size
             end
 
-            def call(t, args, inner_options, url_strategy)
+            def call(t, method_name, args, inner_options, url_strategy)
               if args.size == arg_size && !inner_options && optimize_routes_generation?(t)
                 options = t.url_options.merge @options
                 options[:path] = optimized_helper(args)
@@ -258,7 +258,7 @@ module ActionDispatch
             @route_name   = route_name
           end
 
-          def call(t, args, inner_options, url_strategy)
+          def call(t, method_name, args, inner_options, url_strategy)
             controller_options = t.url_options
             options = controller_options.merge @options
             hash = handle_positional_args(controller_options,
@@ -267,7 +267,7 @@ module ActionDispatch
                                           options,
                                           @segment_keys)
 
-            t._routes.url_for(hash, route_name, url_strategy)
+            t._routes.url_for(hash, route_name, url_strategy, method_name)
           end
 
           def handle_positional_args(controller_options, inner_options, args, result, path_params)
@@ -323,7 +323,7 @@ module ActionDispatch
                 when ActionController::Parameters
                   args.pop.to_h
                 end
-              helper.call(self, args, options, url_strategy)
+              helper.call(self, name, args, options, url_strategy)
             end
           end
       end
@@ -597,14 +597,14 @@ module ActionDispatch
         if route.segment_keys.include?(:controller)
           ActiveSupport::Deprecation.warn(<<-MSG.squish)
             Using a dynamic :controller segment in a route is deprecated and
-            will be removed in Rails 6.1.
+            will be removed in Rails 6.2.
           MSG
         end
 
         if route.segment_keys.include?(:action)
           ActiveSupport::Deprecation.warn(<<-MSG.squish)
             Using a dynamic :action segment in a route is deprecated and
-            will be removed in Rails 6.1.
+            will be removed in Rails 6.2.
           MSG
         end
 
@@ -733,8 +733,8 @@ module ActionDispatch
           end
         end
 
-        # Generates a path from routes, returns [path, params].
-        # If no route is generated the formatter will raise ActionController::UrlGenerationError
+        # Generates a path from routes, returns a RouteWithParams or MissingRoute.
+        # MissingRoute will raise ActionController::UrlGenerationError.
         def generate
           @set.formatter.generate(named_route, options, recall)
         end
@@ -761,13 +761,18 @@ module ActionDispatch
       end
 
       def generate_extras(options, recall = {})
-        route_key = options.delete :use_route
-        path, params = generate(route_key, options, recall)
-        return path, params.keys
+        if recall
+          options = options.merge(_recall: recall)
+        end
+
+        route_name = options.delete :use_route
+        generator = generate(route_name, options, recall)
+        path_info = path_for(options, route_name, [])
+        [URI(path_info).path, generator.params.except(:_recall).keys]
       end
 
-      def generate(route_key, options, recall = {})
-        Generator.new(route_key, options, recall, self).generate
+      def generate(route_name, options, recall = {}, method_name = nil)
+        Generator.new(route_name, options, recall, self).generate
       end
       private :generate
 
@@ -787,12 +792,12 @@ module ActionDispatch
         options.delete(:relative_url_root) || relative_url_root
       end
 
-      def path_for(options, route_name = nil)
-        url_for(options, route_name, PATH)
+      def path_for(options, route_name = nil, reserved = RESERVED_OPTIONS)
+        url_for(options, route_name, PATH, nil, reserved)
       end
 
       # The +options+ argument must be a hash whose keys are *symbols*.
-      def url_for(options, route_name = nil, url_strategy = UNKNOWN)
+      def url_for(options, route_name = nil, url_strategy = UNKNOWN, method_name = nil, reserved = RESERVED_OPTIONS)
         options = default_url_options.merge options
 
         user = password = nil
@@ -812,9 +817,11 @@ module ActionDispatch
         end
 
         path_options = options.dup
-        RESERVED_OPTIONS.each { |ro| path_options.delete ro }
+        reserved.each { |ro| path_options.delete ro }
 
-        path, params = generate(route_name, path_options, recall)
+        route_with_params = generate(route_name, path_options, recall)
+        path = route_with_params.path(method_name)
+        params = route_with_params.params
 
         if options.key? :params
           params.merge! options[:params]
@@ -856,7 +863,7 @@ module ActionDispatch
           params.each do |key, value|
             if value.is_a?(String)
               value = value.dup.force_encoding(Encoding::BINARY)
-              params[key] = URI.parser.unescape(value)
+              params[key] = URI::DEFAULT_PARSER.unescape(value)
             end
           end
           req.path_parameters = params

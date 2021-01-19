@@ -93,6 +93,10 @@ if ActiveRecord::Base.connection.supports_foreign_keys?
         end
 
         def test_rename_reference_column_of_child_table
+          if current_adapter?(:Mysql2Adapter) && !@connection.send(:supports_rename_index?)
+            skip "Cannot drop index, needed in a foreign key constraint"
+          end
+
           rocket = Rocket.create!(name: "myrocket")
           rocket.astronauts << Astronaut.create!
 
@@ -185,8 +189,8 @@ if ActiveRecord::Base.connection.supports_foreign_keys?
         end
 
         teardown do
-          @connection.drop_table "astronauts", if_exists: true
-          @connection.drop_table "rockets", if_exists: true
+          @connection.drop_table "astronauts", if_exists: true rescue nil
+          @connection.drop_table "rockets", if_exists: true rescue nil
         end
 
         def test_foreign_keys
@@ -302,6 +306,20 @@ if ActiveRecord::Base.connection.supports_foreign_keys?
 
           fk = foreign_keys.first
           assert_equal :nullify, fk.on_update
+        end
+
+        def test_add_foreign_key_with_non_existent_from_table_raises
+          e = assert_raises StatementInvalid do
+            @connection.add_foreign_key :missions, :rockets
+          end
+          assert_match(/missions/, e.message)
+        end
+
+        def test_add_foreign_key_with_non_existent_to_table_raises
+          e = assert_raises StatementInvalid do
+            @connection.add_foreign_key :missions, :rockets
+          end
+          assert_match(/missions/, e.message)
         end
 
         def test_foreign_key_exists
